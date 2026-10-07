@@ -1,23 +1,25 @@
-<!-- Dernière génération/modification faite par l'IA Claude le 07/10/2026 15:52:12 -->
+<!-- Dernière génération/modification faite par l'IA Claude le 07/10/2026 17:16:32 -->
 # Architecture et conventions
 
 ## Couches
 
 ```
-┌───────────────────────────────────────────────────────────────┐
-│ TESTS  (src/test/java)                                        │
-│   login/      LoginPassantTest, LoginNonPassantTest,          │
-│               LoginAffichageTest                              │
-│   inventaire/ InventaireCatalogueTest, InventairePanierTest,  │
-│               InventaireTriTest                               │
-│   → scénarios Étant donné / Quand / Alors, assertions         │
-└──────────────┬────────────────────────────────┬───────────────┘
-               │ injecte / chaîne               │ lit
-┌──────────────▼──────────────┐   ┌─────────────▼───────────────┐
-│ PAGES (Page Object Model)   │   │ DONNÉES                     │
-│   LoginPage → InventairePage│   │   CSV + Cas* + ${cle}       │
-│   Tri, ProduitAffiche       │   │   FichierCsv (catalogue)    │
-└──────────────┬──────────────┘   └─────────────────────────────┘
+┌──────────────────────────────────────┐  ┌──────────────────────────────────────────┐
+│ TESTS JUnit  (src/test/java)         │  │ SCÉNARIOS GHERKIN (src/test/resources)   │
+│   login/      LoginPassantTest, …    │  │   features/inventaire/tri.feature        │
+│   inventaire/ InventaireTriTest, …   │  │              │ exécutés par              │
+│   → Étant donné / Quand / Alors en   │  │ ÉTAPES (src/test/java …/etapes)          │
+│     commentaires, assertions         │  │   EtapesConnexion, EtapesTri,            │
+│                                      │  │   TypesParametres → assertions           │
+└──────────────┬───────────────────────┘  └──────────────┬───────────────────────────┘
+               │ injecte (paramètres)                     │ injecte (ContexteScenario)
+               └──────────────────┬───────────────────────┘
+                                  │ appellent / chaînent               lisent
+┌─────────────────────────────────▼───┐   ┌────────────────────────────────────────┐
+│ PAGES (Page Object Model)           │   │ DONNÉES                                │
+│   LoginPage → InventairePage        │   │   CSV + Cas* + ${cle}                  │
+│   Tri, ProduitAffiche               │   │   FichierCsv (catalogue, tris)         │
+└──────────────┬──────────────────────┘   └────────────────────────────────────────┘
                │ assemble
 ┌──────────────▼────────────────────────────────────────────────┐
 │ COMPOSANTS APPLICATIFS (saucedemo.composants)                 │
@@ -33,41 +35,60 @@
                │ s'appuie sur
 ┌──────────────▼────────────────────────────────────────────────┐
 │ SOCLE TECHNIQUE                                               │
-│   PlaywrightExtension · SessionNavigateur · Configuration     │
-│   Logback (log par test) · RapportHtmlListener                │
+│   CycleDeVieTest ◄─ PlaywrightExtension (adaptateur JUnit)    │
+│                  ◄─ HooksPlaywright + ContexteScenario        │
+│                     (adaptateur Cucumber)                     │
+│   SessionNavigateur · Configuration · FabriquePages           │
+│   Logback (log par test) · RapportHtmlListener ◄ CanalArtefacts│
 └───────────────────────────────────────────────────────────────┘
 ```
 
-Le package `framework` ne référence **jamais** le package `saucedemo`. Le socle peut donc être extrait tel quel dans un module Maven partagé par plusieurs applications. Un composant ne va dans `framework.composants` que s'il est générique (un `<select>`, un compteur, une collection) ; ce qui décrit un écran de SauceDemo (en-tête, carte produit) va dans `saucedemo.composants`.
+Le package `framework` ne référence **jamais** le package `saucedemo`. Le socle peut donc être extrait tel quel dans un module Maven partagé par plusieurs applications. Un composant ne va dans `framework.composants` que s'il est générique (un `<select>`, un compteur, une collection) ; ce qui décrit un écran de SauceDemo (en-tête, carte produit) va dans `saucedemo.composants`. Il en va de même pour Cucumber : `framework.cucumber` (hooks, contexte de scénario) est générique, les étapes et types de paramètres SauceDemo sont dans `saucedemo.etapes`.
 
 ## Responsabilités
 
 | Élément | Fait | Ne fait pas |
 |---|---|---|
-| Test | Enchaîne des actions métier et vérifie le résultat | Manipuler un sélecteur, le navigateur ou une donnée en dur |
+| Test JUnit | Enchaîne des actions métier et vérifie le résultat | Manipuler un sélecteur, le navigateur ou une donnée en dur |
+| Fonctionnalité Gherkin | Décrit le comportement attendu en langage métier, avec des exemples | Décrire des actions techniques (clics, sélecteurs) |
+| Étape (step definition) | Traduit une phrase Gherkin en appels de pages et en assertions | Manipuler un sélecteur ou le navigateur ; garder un état ailleurs que dans `ContexteScenario` |
 | Page | Assemble des composants, expose des actions métier et des lectures, renvoie la page suivante (chaînage) | Faire des assertions |
 | Composant applicatif | Assemble des composants génériques sous sa racine (composite) | Connaître la page qui le contient ou faire des assertions |
 | Composant générique | Encapsule un élément d'IHM et journalise ses actions | Connaître l'application testée ou faire des assertions |
-| Extension | Gère le cycle de vie, l'injection, les captures, les traces et les logs | Contenir de la logique métier |
+| `CycleDeVieTest` | Contexte navigateur, log par test, capture, trace, fermeture, publication des artefacts | Dépendre d'un moteur de test (JUnit ou Cucumber) |
+| Extension / hooks | Adaptent le cycle de vie à leur moteur (session, injection, publication) | Contenir de la logique métier |
 
 ## Cycle de vie d'un test
 
-```
-1er test de l'exécution
- └─ SessionNavigateur.demarrer()          Playwright + Browser (store racine JUnit)
+Le même `CycleDeVieTest` sert aux deux moteurs. Seuls changent le déclencheur et la façon de publier les artefacts.
 
-pour chaque test
- ├─ beforeEach  → MDC (log par test), BrowserContext neuf, tracing.start, Page
- ├─ résolution  → LoginPage(page, config) injectée en paramètre
- ├─ @BeforeEach → (inventaire) connexion par l'IHM, InventairePage obtenue par chaînage
- ├─ test        → actions + assertions
- └─ afterEach   → si échec : capture + trace + URL ; fermeture du contexte ;
-                  publication des artefacts (report entries)
-
-fin de l'exécution
- ├─ fermeture automatique de SessionNavigateur (AutoCloseable dans le store)
- └─ RapportHtmlListener → target/rapport-e2e/index.html
 ```
+                    TEST JUnit (@TestE2E)                    SCÉNARIO Gherkin
+                    ─────────────────────                    ────────────────
+1er test            SessionNavigateur.demarrer()             SessionNavigateur.demarrer()
+                    (store racine JUnit)                     (champ statique de HooksPlaywright)
+
+avant               PlaywrightExtension.beforeEach           HooksPlaywright @Before(order = 0)
+                          └──────────────► CycleDeVieTest.demarrer ◄──────────┘
+                              MDC (log par test), BrowserContext neuf, tracing, Page
+
+préparation         LoginPage(page, config) injectée         ContexteScenario injecté dans les étapes
+                    en paramètre ; @BeforeEach               « Contexte : Étant donné un utilisateur
+                    (connexion → InventairePage)             connecté… » (connexion → page courante)
+
+test                actions + assertions                     étapes Étant donné / Quand / Alors
+
+après               PlaywrightExtension.afterEach            HooksPlaywright @After(order = 0)
+                          └──────────────► CycleDeVieTest.terminer ◄──────────┘
+                              si échec : URL + capture ; trace ; fermeture du contexte
+                    publication : report entries JUnit       publication : CanalArtefacts
+                                                             (+ capture jointe au rapport Cucumber)
+
+fin                 fermeture de la session (store)          @AfterAll : fermeture de la session
+                          └──────────────► RapportHtmlListener → index.html ◄─┘
+```
+
+Deux sessions navigateur sont donc démarrées lors d'une exécution complète, une par moteur. Les deux moteurs s'exécutent l'un après l'autre (séquentiel).
 
 ## Navigation entre pages
 
@@ -259,6 +280,37 @@ Structure de https://www.saucedemo.com/inventory.html (outer HTML simplifié : i
 | En-tête commun à toutes les pages connectées | Le recopier dans chaque page | Composant `EnTeteApplication`, obtenu par `entete()` |
 | Menu latéral masqué (`hidden="true"`) | Cliquer sur des liens invisibles | Hors périmètre ; seul le bouton d'ouverture est déclaré |
 
+## Couche Gherkin (Cucumber)
+
+### Composants
+
+| Élément | Package | Rôle |
+|---|---|---|
+| `ScenariosGherkinTest` | `saucedemo.gherkin` (test) | Suite JUnit Platform (`@Suite`, `@IncludeEngines("cucumber")`, `@SelectPackages("features")`) : seul point d'entrée des scénarios, lancé par Surefire et l'IDE. Déclare la glue, le nommage des exemples et le rapport Cucumber |
+| `features/**/*.feature` | ressources de test | Fonctionnalités en français (`# language: fr`) |
+| `HooksPlaywright` | `framework.cucumber` | `@Before` / `@After` d'ordre 0 (démarrent avant et terminent après ceux de l'application) qui délèguent à `CycleDeVieTest` ; `@AfterAll` ferme la session |
+| `ContexteScenario` | `framework.cucumber` | État d'un scénario, injecté par Picocontainer : page Playwright, création de pages (`FabriquePages`), page courante mémorisée par chaînage |
+| `CanalArtefacts` | `framework.rapport` | Transmet capture, trace, log et URL d'un scénario au rapport HTML (le moteur Cucumber ne publie pas de report entries) |
+| `EtapesConnexion`, `EtapesTri` | `saucedemo.etapes` (test) | Étapes : appellent les pages, contiennent les assertions |
+| `TypesParametres`, `TriChoisi` | `saucedemo.etapes` (test) | Type `{tri}` : libellé affiché → `Tri`, via la correspondance de `tris.csv` |
+
+`InventaireTriTest` (JUnit) et `tri.feature` (Gherkin) couvrent le même besoin avec les mêmes vérifications. C'est voulu : ils servent de point de comparaison entre les deux styles.
+
+### Pièges de l'intégration et parades
+
+| Piège | Risque | Parade |
+|---|---|---|
+| L'extension JUnit (`PlaywrightExtension`) n'est pas exécutée par le moteur Cucumber | Scénarios sans navigateur, sans log, sans capture | Cycle de vie extrait dans `CycleDeVieTest`, utilisé par l'extension et par `HooksPlaywright` |
+| Le moteur Cucumber ne publie pas de report entries | Rapport HTML sans capture, trace ni log pour les scénarios | `CanalArtefacts`, branché par `RapportHtmlListener` sur le test en cours (exécution séquentielle) |
+| Le moteur Cucumber découvre aussi les features seul, en moteur racine | Scénarios exécutés deux fois dans certains IDE | `cucumber.junit-platform.discovery.as-root-engine=false` dans `junit-platform.properties` ; passage obligé par la suite |
+| `@SelectClasspathResource("features")` | Cucumber 8 refuse un dossier : 0 scénario, simple avertissement | `@SelectPackages("features")` |
+| Cucumber 8 sans bibliothèque JSON | Tout le moteur échoue au démarrage (« Cucumber needs a JSON library ») | Dépendance `tools.jackson.core:jackson-databind` (Jackson 3), scope `runtime` |
+| Surefire 3.5.3 | Scénarios non comptés, et **un scénario ou un moteur en échec laisse le build vert** | Surefire 3.5.6. Effet de bord : `classname` = `@DisplayName` dans les XML |
+| URI de feature `classpath:features/…` opaque | `URI.getPath()` renvoie `null` (nom de fichier de log impossible) | `getUri().toString()` |
+| Le hook `@After` ne reçoit pas l'exception de l'étape | Log d'échec sans message | Statut du scénario dans le log ; l'erreur détaillée est dans le log Cucumber, le rapport Surefire et le rapport Cucumber |
+| Correspondance libellé ↔ code de tri | Libellés recopiés dans le code Java des étapes | Lue dans `tris.csv`, source unique déjà utilisée par les tests JUnit |
+| `« Name (A to Z) »` actif par défaut | Scénario « az » qui passerait sans que le tri agisse | Étape `Étant donné les produits triés par …` (attend le libellé du tri préalable) + garde-fou dans `Quand` : le tri demandé ne doit pas être déjà actif |
+
 ## Évolutions possibles
 
 - **Module partagé** : extraire `framework` en artefact Maven `kerware-e2e-framework`, versionné sémantiquement.
@@ -266,4 +318,5 @@ Structure de https://www.saucedemo.com/inventory.html (outer HTML simplifié : i
 - **Vidéo** : `Browser.NewContextOptions.setRecordVideoDir(...)` sur échec.
 - **Authentification réutilisable** : `BrowserContext.storageState()` pour sauter l'écran de login dans les tests des autres pages (aujourd'hui, la connexion passe par l'IHM à chaque test d'inventaire).
 - **Page panier** : `PanierPage` renvoyée par `EnTeteApplication.ouvrirPanier()`, en réutilisant `EnTeteApplication` et `ListeDeComposants`.
-- **Remontée vers Squash TM** : exploiter les XML de `target/surefire-reports` ou les identifiants `LP-xx`, `LNP-xx`, `PR-xx`, `TRI-xx`.
+- **Remontée vers Squash TM** : exploiter les XML de `target/surefire-reports` ou les identifiants `LP-xx`, `LNP-xx`, `PR-xx`, `TRI-xx`. En BDD, Squash TM peut générer les fichiers `.feature` à partir des cas de test.
+- **Gherkin** : décider entre cohabitation durable (JUnit pour les tests techniques ou très paramétrés, Gherkin pour les parcours métier) et migration progressive. Une session navigateur unique pour les deux moteurs est possible (singleton du socle) si le temps de démarrage devient gênant.

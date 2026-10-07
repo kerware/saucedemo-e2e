@@ -1,7 +1,31 @@
-<!-- Dernière génération/modification faite par l'IA Claude le 07/10/2026 15:52:12 -->
+<!-- Dernière génération/modification faite par l'IA Claude le 07/10/2026 17:16:32 -->
 # Historique des versions
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versionnement [sémantique](https://semver.org/lang/fr/).
+
+## [1.2.0] — 2026-10-07
+
+Couche Gherkin / Cucumber, sans rupture : les 30 tests JUnit sont inchangés et passent toujours.
+
+### Ajouté
+
+- **Scénarios Gherkin en français** : `features/inventaire/tri.feature`, un plan de scénario sur les 4 tris des produits (tags `e2e`, `gherkin`, `inventaire`, `tri`).
+- **Étapes** (`saucedemo.etapes`) : `EtapesConnexion`, `EtapesTri`, type de paramètre `{tri}` (`TypesParametres`, `TriChoisi`).
+- **Point d'entrée** : suite `ScenariosGherkinTest` (JUnit Platform Suite → moteur Cucumber), lancée par Maven et par l'IDE.
+- **Socle Cucumber générique** (`framework.cucumber`) : `HooksPlaywright` (cycle de vie Playwright des scénarios), `ContexteScenario` (état d'un scénario injecté dans les étapes).
+- **Socle** : `framework.execution.CycleDeVieTest` (cycle de vie commun JUnit / Cucumber), `framework.pages.FabriquePages`, `framework.rapport.CanalArtefacts`.
+- `CasTri.triDuLibelle(libelle)` : correspondance libellé → `Tri` lue dans `tris.csv`.
+- Rapport Cucumber `target/rapport-e2e/cucumber.html`, en complément du rapport HTML du framework.
+- Dépendances : `cucumber-java`, `cucumber-junit-platform-engine`, `cucumber-picocontainer` (BOM Cucumber 8.0.4), `junit-platform-suite`, `tools.jackson.core:jackson-databind` 3.2.3 (runtime, exigé par les rapports Cucumber 8).
+
+### Modifié
+
+- `PlaywrightExtension` délègue désormais à `CycleDeVieTest` et `FabriquePages`. Comportement et constantes publiques inchangés ; seul le nom du logger des lignes « DEBUT / FIN DU TEST » change (`CycleDeVieTest`).
+- `RapportHtmlListener` : branche `CanalArtefacts` sur le test en cours ; range un test issu d'un moteur emboîté (Cucumber) sous sa fonctionnalité.
+- `junit-platform.properties` : `cucumber.junit-platform.discovery.as-root-engine=false`.
+- **Surefire 3.5.3 → 3.5.6** : nécessaire, car la 3.5.3 ne compte pas les scénarios et laisse le build vert quand un scénario échoue. Effet de bord : dans `target/surefire-reports/*.xml`, l'attribut `classname` vaut désormais le `@DisplayName` de la classe ; les noms de fichiers sont inchangés.
+- Version du projet : `1.1.0-SNAPSHOT` → `1.2.0-SNAPSHOT`.
+- Documentation : README, `UTILISATION.md` (section 7 « Scénarios Gherkin »), `ARCHITECTURE.md` (couches, cycle de vie commun, couche Gherkin, pièges de l'intégration).
 
 ## [1.1.0] — 2026-10-07
 

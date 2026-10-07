@@ -1,4 +1,4 @@
-<!-- Dernière génération/modification faite par l'IA Claude le 07/10/2026 15:52:12 -->
+<!-- Dernière génération/modification faite par l'IA Claude le 07/10/2026 17:16:32 -->
 # Utilisation
 
 ## 1. Lancer les tests
@@ -22,18 +22,21 @@ mvn clean verify -Dgroups=inventaire                     # toute la page d'inven
 mvn clean verify -Dgroups=panier                         # ajout / retrait au panier
 mvn clean verify -Dgroups=tri                            # les 4 tris de produits
 mvn clean verify -Dgroups=inventaire -DexcludedGroups=tri
+mvn clean verify -Dgroups=gherkin                        # scénarios Gherkin uniquement
+mvn clean verify -DexcludedGroups=gherkin                # tests JUnit uniquement
 ```
 
-Tags disponibles :
+Tags disponibles. Les tags Gherkin (`@tri` dans une feature) sont des tags JUnit comme les autres : `-Dgroups` sélectionne indifféremment des tests JUnit et des scénarios.
 
 | Tag | Tests |
 |---|---|
-| `e2e` | tous (posé par `@TestE2E`) |
+| `e2e` | tous (posé par `@TestE2E`, ou `@e2e` dans les features) |
 | `smoke` | `LoginAffichageTest`, `InventaireCatalogueTest` |
 | `login` | `LoginAffichageTest`, `LoginPassantTest`, `LoginNonPassantTest` |
-| `inventaire` | `InventaireCatalogueTest`, `InventairePanierTest`, `InventaireTriTest` |
+| `inventaire` | `InventaireCatalogueTest`, `InventairePanierTest`, `InventaireTriTest`, `tri.feature` |
 | `panier` | `InventairePanierTest` |
-| `tri` | `InventaireTriTest` |
+| `tri` | `InventaireTriTest`, `tri.feature` |
+| `gherkin` | tous les scénarios Gherkin (`tri.feature`) |
 
 ### Ne pas bloquer le build en cas d'échec
 
@@ -156,14 +159,18 @@ Tout est produit dans `target/rapport-e2e/` :
 
 ```
 target/rapport-e2e/
-├── index.html                 rapport HTML (à ouvrir dans un navigateur)
+├── index.html                 rapport HTML (à ouvrir dans un navigateur) : tests JUnit et scénarios Gherkin
+├── cucumber.html              rapport Cucumber (scénarios Gherkin uniquement, captures d'échec jointes)
 ├── captures/                  captures d'écran pleine page des tests en échec
 ├── traces/                    traces Playwright des tests en échec (ou toutes si traces.mode=toujours)
 └── logs/
     ├── execution.log          log complet de l'exécution
     ├── hors-test.log          logs émis hors d'un test (démarrage, arrêt)
-    └── <Classe>_<methode>_<n>.log   un fichier par test
+    ├── <Classe>_<methode>_<n>.log         un fichier par test JUnit
+    └── <feature>_L<ligne>_<scénario>.log  un fichier par scénario Gherkin (ex. tri_L24_Trier_par___Name__A_to_Z_____TRI-01_.log)
 ```
+
+Dans le rapport HTML, un scénario Gherkin est rangé sous le nom de sa fonctionnalité (« Tri des produits de l'inventaire »), avec pour nom « plan du scénario › Exemples › exemple ».
 
 ### Le rapport HTML
 
@@ -181,15 +188,18 @@ target/rapport-e2e/
 ### Le log d'un test (extrait)
 
 ```
-10:42:01.120 INFO  PlaywrightExtension - ========== DEBUT DU TEST : [4] LNP-04 : Mot de passe vide ==========
+10:42:01.120 INFO  CycleDeVieTest      - ========== DEBUT DU TEST : [4] "LNP-04" : "Mot de passe vide" ==========
+10:42:01.121 INFO  CycleDeVieTest      - Classe : com.kerware.e2e.saucedemo.login.LoginNonPassantTest | Méthode : connexionRefusee
 10:42:01.512 INFO  LoginPage           - Ouverture de la page https://www.saucedemo.com/
 10:42:01.803 INFO  e2e.navigateur      - Navigation vers https://www.saucedemo.com/
 10:42:01.950 INFO  LoginPage           - Tentative de connexion avec l'utilisateur 'standard_user'
 10:42:01.951 INFO  ChampSaisie         - Saisie dans 'Nom d'utilisateur' : 'standard_user'
 10:42:01.990 INFO  ChampSaisie         - Saisie dans 'Mot de passe' : (vide)
 10:42:02.020 INFO  Bouton              - Clic sur 'Login'
-10:42:02.105 INFO  PlaywrightExtension - [SUCCES] [4] LNP-04 : Mot de passe vide
+10:42:02.105 INFO  CycleDeVieTest      - [SUCCES] [4] "LNP-04" : "Mot de passe vide"
 ```
+
+Pour un scénario Gherkin, la deuxième ligne indique le fichier et la ligne : `Scénario : classpath:features/inventaire/tri.feature:24 | Tags : [@e2e, @gherkin, @inventaire, @tri]`. JUnit 6 met entre guillemets les arguments de type texte dans les noms des tests paramétrés (`"LNP-04"`).
 
 Les champs déclarés sensibles (`ChampSaisie.sensible(...)`) apparaissent masqués (`********`).
 
@@ -205,7 +215,11 @@ On peut aussi glisser le fichier `.zip` sur https://trace.playwright.dev. La tra
 
 ### Rapport Surefire standard (complément)
 
-Les fichiers XML JUnit restent produits dans `target/surefire-reports/`, pour intégration dans Jenkins, GitLab ou Squash TM. Un rapport HTML Surefire peut aussi être généré :
+Les fichiers XML JUnit restent produits dans `target/surefire-reports/`, pour intégration dans Jenkins, GitLab ou Squash TM. Les scénarios Gherkin sont dans `TEST-com.kerware.e2e.saucedemo.gherkin.ScenariosGherkinTest.xml`, un `testcase` par exemple (`name="Trier par « Name (A to Z) » (TRI-01)"`).
+
+> **Depuis la version 1.2.0 (Surefire 3.5.6)** : dans ces XML, l'attribut `classname` des `testcase` vaut le `@DisplayName` de la classe (ex. `Connexion - cas passants`) et non plus son nom qualifié. Les noms de fichiers `TEST-<classe>.xml` ne changent pas. À vérifier si un outil exploite `classname` (rapprochement Squash TM, regroupement Jenkins).
+
+Un rapport HTML Surefire peut aussi être généré :
 
 ```bash
 mvn surefire-report:report-only
@@ -311,7 +325,84 @@ Le principe est le même pour GitLab CI ou Jenkins :
 
 On peut aussi utiliser l'image Docker officielle `mcr.microsoft.com/playwright/java:v1.55.0-noble`, qui embarque le JDK, Maven et les navigateurs.
 
-## 7. Dépannage
+Les scénarios Gherkin sont lancés par la même commande : aucune étape de CI supplémentaire. Pour publier aussi le rapport Cucumber, il est déjà dans `target/rapport-e2e/cucumber.html`.
+
+## 7. Scénarios Gherkin (Cucumber)
+
+### Où sont les fichiers
+
+| Élément | Emplacement |
+|---|---|
+| Fonctionnalités (`.feature`, en français) | `src/test/resources/features/<domaine>/` |
+| Étapes (step definitions) | `src/test/java/com/kerware/e2e/saucedemo/etapes/` |
+| Types de paramètres (`{tri}`) | `etapes/TypesParametres.java` |
+| Point d'entrée Maven / IDE | `src/test/java/com/kerware/e2e/saucedemo/gherkin/ScenariosGherkinTest.java` |
+| Hooks du framework (navigateur, logs, captures) | `framework/cucumber/HooksPlaywright.java`, à ne pas modifier |
+
+Dans l'IDE, on lance `ScenariosGherkinTest` comme une classe de test. Le plugin Cucumber d'IntelliJ permet aussi de naviguer entre une étape et son code.
+
+### Écrire un scénario
+
+```gherkin
+# language: fr
+@e2e @gherkin @inventaire @tri
+Fonctionnalité: Tri des produits de l'inventaire
+
+  Contexte:
+    Étant donné un utilisateur connecté sur la page d'inventaire
+
+  Plan du scénario: Trier par « <tri> » (<id>)
+    Étant donné les produits triés par "<préalable>"
+    Quand je trie les produits par "<tri>"
+    Alors le tri actif affiché est "<tri>"
+    Et les produits sont dans l'ordre "<tri>"
+    Et tous les produits du catalogue sont présents
+
+    Exemples:
+      | id     | tri                 | préalable           |
+      | TRI-01 | Name (A to Z)       | Name (Z to A)       |
+```
+
+Règles :
+
+- **`# language: fr`** en tête de fichier : mots-clés `Fonctionnalité`, `Contexte`, `Scénario`, `Plan du scénario`, `Exemples`, `Étant donné`, `Quand`, `Alors`, `Et`, `Mais`.
+- **Tags** : toujours `@e2e` et `@gherkin`, plus les tags fonctionnels (`@inventaire`, `@tri`…). Ce sont des tags JUnit (`-Dgroups=tri`).
+- **Une étape = une intention métier**, jamais une action technique (« je clique sur le bouton… »). Elle s'écrit avec les libellés de l'écran (« Price (low to high) »).
+- **Nom du plan de scénario avec `<id>`** : chaque exemple apparaît sous un nom distinct dans le rapport (« Trier par « Name (A to Z) » (TRI-01) ») et garde la traçabilité vers l'outil de gestion des tests.
+- **Données** : les tableaux `Exemples` sont lisibles par le métier. Les données de référence partagées (catalogue, correspondance libellé ↔ code de tri) restent dans les CSV de `src/test/resources/donnees/`. Pas d'identifiant ni de secret dans une feature : `un utilisateur connecté` utilise `utilisateur.defaut` / `motdepasse.defaut`.
+
+### Écrire une étape
+
+```java
+public class EtapesTri {
+    private final ContexteScenario contexte;                 // injecté par Cucumber, un par scénario
+
+    public EtapesTri(ContexteScenario contexte) { this.contexte = contexte; }
+
+    @Quand("je trie les produits par {tri}")
+    public void jeTrieLesProduitsPar(TriChoisi tri) {
+        contexte.pageCourante(InventairePage.class).trierPar(tri.tri());
+    }
+}
+```
+
+- **Annotations françaises** : `io.cucumber.java.fr.Etantdonné`, `Quand`, `Alors`. Le mot-clé de la feature n'a pas d'importance pour la correspondance : une étape `@Alors` peut être écrite `Et …`.
+- **`ContexteScenario`** (framework) : `page(LoginPage.class)` crée une page, `definirPageCourante(page)` mémorise la page atteinte par chaînage, `pageCourante(InventairePage.class)` la retrouve dans les étapes suivantes, `configuration()` donne la configuration.
+- **Assertions** : `PlaywrightAssertions.assertThat(...)` et JUnit `assertEquals`, comme dans les tests JUnit. Aucun sélecteur dans une étape : on passe par les pages.
+- **Nouvelle classe d'étapes** : dans le package `com.kerware.e2e.saucedemo.etapes` (déjà dans la glue), avec un constructeur public. Picocontainer l'instancie à chaque scénario.
+
+### Ajouter un type de paramètre
+
+```java
+@ParameterType(name = "tri", value = "\"([^\"]*)\"")
+public TriChoisi tri(String libelle) {
+    return new TriChoisi(libelle, CasTri.triDuLibelle(libelle));    // libellé → Tri via tris.csv
+}
+```
+
+Un libellé inconnu de `tris.csv` fait échouer l'étape avec un message explicite.
+
+## 8. Dépannage
 
 | Symptôme | Piste |
 |---|---|
@@ -320,3 +411,8 @@ On peut aussi utiliser l'image Docker officielle `mcr.microsoft.com/playwright/j
 | `ParameterResolutionException ... constructeur public (Page, Configuration)` | La page injectée doit déclarer exactement ce constructeur. |
 | Pas de `index.html` | Vérifier `src/main/resources/META-INF/services/org.junit.platform.launcher.TestExecutionListener`. |
 | Caractères accentués illisibles dans la console Windows | Lancer `chcp 65001` avant Maven. Les fichiers de log sont toujours en UTF-8. |
+| `ScenariosGherkinTest` : `Tests run: 0` | Vérifier que le package `features` contient des `.feature` et que la version de Surefire est ≥ 3.5.4 (avec la 3.5.3, les scénarios ne sont ni comptés ni pris en compte dans le résultat du build). |
+| `Cucumber needs a JSON library to write reports` | La dépendance `tools.jackson.core:jackson-databind` manque : le plugin de rapport Cucumber 8 en a besoin. |
+| `Undefined step` / étape non reconnue | Le texte de l'étape ne correspond à aucune annotation de `etapes/`. Vérifier les guillemets autour des paramètres `{tri}`. |
+| `La page courante devrait être InventairePage mais est absente` | Le scénario n'a pas d'étape de précondition qui mémorise la page (`Étant donné un utilisateur connecté…`). |
+| `Libellé de tri inconnu de /donnees/inventaire/tris.csv` | Le libellé écrit dans la feature n'est pas dans `tris.csv` (casse et parenthèses comprises). |

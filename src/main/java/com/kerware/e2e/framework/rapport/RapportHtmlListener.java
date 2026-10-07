@@ -1,3 +1,4 @@
+// Dernière génération/modification faite par l'IA Claude le 07/10/2026 17:16:32
 package com.kerware.e2e.framework.rapport;
 
 import com.kerware.e2e.framework.config.Configuration;
@@ -29,7 +30,9 @@ import java.util.Optional;
  * il fonctionne aussi bien sous Maven que depuis l'IDE.</p>
  *
  * <p>Il récupère les artefacts publiés par {@code PlaywrightExtension} (capture, trace, log, URL)
- * via les « report entries » JUnit, sans couplage direct avec l'extension.</p>
+ * via les « report entries » JUnit, sans couplage direct avec l'extension. Les scénarios Cucumber,
+ * dont le moteur ne publie pas de report entries, passent par {@link CanalArtefacts}, branché
+ * sur le test en cours.</p>
  */
 public class RapportHtmlListener implements TestExecutionListener {
 
@@ -53,7 +56,8 @@ public class RapportHtmlListener implements TestExecutionListener {
     public void executionStarted(TestIdentifier id) {
         departs.put(id.getUniqueId(), System.nanoTime());
         if (id.isTest()) {
-            resultat(id);
+            ResultatTest resultat = resultat(id);
+            CanalArtefacts.brancher((cle, valeur) -> resultat.artefacts.put(cle, valeur));
         }
     }
 
@@ -70,6 +74,9 @@ public class RapportHtmlListener implements TestExecutionListener {
     public void executionFinished(TestIdentifier id, TestExecutionResult resultatExecution) {
         boolean conteneurEnErreur = id.isContainer()
                 && resultatExecution.getStatus() != TestExecutionResult.Status.SUCCESSFUL;
+        if (id.isTest()) {
+            CanalArtefacts.debrancher();
+        }
         if (!id.isTest() && !conteneurEnErreur) {
             return;
         }
@@ -127,17 +134,29 @@ public class RapportHtmlListener implements TestExecutionListener {
         return resultats.computeIfAbsent(id.getUniqueId(), cle -> creerResultat(id));
     }
 
-    /** Suite = classe de test (la plus externe) ; nom = méthode › invocation. */
+    /**
+     * Suite = classe de test (la plus externe) ; nom = méthode › invocation.
+     *
+     * <p>Si le test vient d'un moteur emboîté dans une suite (Cucumber lancé par {@code @Suite}),
+     * le chemin repart après ce moteur : suite = fonctionnalité Gherkin, nom = scénario › exemple.</p>
+     */
     private ResultatTest creerResultat(TestIdentifier id) {
         Deque<String> chemin = new ArrayDeque<>();
         Optional<TestIdentifier> courant = Optional.of(id);
-        while (courant.isPresent() && plan.getParent(courant.get()).isPresent()) {
+        while (courant.isPresent() && plan.getParent(courant.get()).isPresent()
+                && !estMoteurEmboite(courant.get())) {
             chemin.addFirst(courant.get().getDisplayName());
             courant = plan.getParent(courant.get());
         }
         String suite = chemin.isEmpty() ? id.getDisplayName() : chemin.removeFirst();
         String nom = chemin.isEmpty() ? "(initialisation de la classe)" : String.join(" › ", chemin);
         return new ResultatTest(id.getUniqueId(), suite, nom, source(id));
+    }
+
+    /** Moteur de test qui n'est pas une racine du plan (ex. moteur Cucumber exécuté par la suite JUnit). */
+    private boolean estMoteurEmboite(TestIdentifier id) {
+        return plan.getParent(id).isPresent()
+                && "engine".equals(id.getUniqueIdObject().getLastSegment().getType());
     }
 
     private static String source(TestIdentifier id) {

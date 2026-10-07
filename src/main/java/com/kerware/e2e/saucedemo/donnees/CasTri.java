@@ -1,7 +1,8 @@
-// Dernière génération/modification faite par l'IA Claude le 07/10/2026 15:52:12
+// Dernière génération/modification faite par l'IA Claude le 07/10/2026 17:16:32
 package com.kerware.e2e.saucedemo.donnees;
 
 import com.kerware.e2e.framework.donnees.DonneesTest;
+import com.kerware.e2e.framework.donnees.FichierCsv;
 import com.kerware.e2e.saucedemo.pages.Tri;
 import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.params.aggregator.ArgumentsAccessor;
@@ -28,6 +29,21 @@ public record CasTri(String id, Tri tri, String libelle, Tri triPrealable) {
             throw new IllegalArgumentException(FICHIER + " : " + id
                     + " : le tri préalable doit différer du tri testé (" + tri.codeOption() + ")");
         }
+    }
+
+    /**
+     * Tri dont le libellé affiché est {@code libelle}, d'après la correspondance libellé ↔ code
+     * de {@code tris.csv}. Utilisé par les scénarios Gherkin, qui désignent les tris par leur libellé.
+     *
+     * @throws IllegalArgumentException si le libellé est absent du fichier
+     */
+    public static Tri triDuLibelle(String libelle) {
+        return FichierCsv.lire(FICHIER).stream()
+                .filter(ligne -> libelle.equals(DonneesTest.resoudre(ligne.get("libelle"))))
+                .map(ligne -> Tri.depuisCode(DonneesTest.resoudre(ligne.get("codeOption"))))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Libellé de tri inconnu de " + FICHIER + " : '" + libelle + "'"));
     }
 
     @Override

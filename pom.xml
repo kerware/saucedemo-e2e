@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Dernière génération/modification faite par l'IA Claude le 07/10/2026 15:52:12 -->
+<!-- Dernière génération/modification faite par l'IA Claude le 07/10/2026 17:16:32 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -7,7 +7,7 @@
 
     <groupId>com.kerware</groupId>
     <artifactId>saucedemo-e2e</artifactId>
-    <version>1.1.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>SauceDemo E2E - Playwright Java / JUnit 6</name>
@@ -23,14 +23,16 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- Versions des dépendances : centralisées ici pour faciliter les montées de version -->
-        <junit.version>6.0.0</junit.version>
-        <playwright.version>1.55.0</playwright.version>
-        <slf4j.version>2.0.17</slf4j.version>
-        <logback.version>1.5.18</logback.version>
+        <junit.version>6.0.0</junit.version>                <!-- moteur de tests (Jupiter + Platform) -->
+        <playwright.version>1.55.0</playwright.version>     <!-- pilotage du navigateur -->
+        <slf4j.version>2.0.17</slf4j.version>               <!-- API de journalisation -->
+        <logback.version>1.5.18</logback.version>           <!-- implémentation de journalisation -->
+        <cucumber.version>8.0.4</cucumber.version>          <!-- couche Gherkin : moteur compatible JUnit 6 -->
+        <jackson.version>3.2.3</jackson.version>            <!-- JSON exigé par les rapports Cucumber 8 -->
 
         <!-- Versions des plugins -->
         <maven-compiler-plugin.version>3.14.0</maven-compiler-plugin.version>
-        <maven-surefire-plugin.version>3.5.3</maven-surefire-plugin.version>
+        <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
         <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
         <exec-maven-plugin.version>3.5.0</exec-maven-plugin.version>
     </properties>
@@ -43,6 +45,13 @@
                 <version>${junit.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.cucumber</groupId>
+                <artifactId>cucumber-bom</artifactId>
+                <version>${cucumber.version}</version>
+                <scope>import</scope>
+                <type>pom</type>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -76,6 +85,33 @@
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
             <version>${logback.version}</version>
+        </dependency>
+        <!-- Couche Gherkin : annotations des étapes, moteur Cucumber pour la JUnit Platform,
+             injection par constructeur de l'état partagé d'un scénario -->
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-java</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-junit-platform-engine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-picocontainer</artifactId>
+        </dependency>
+        <!-- Cucumber 8 n'embarque plus de bibliothèque JSON : sans elle, le plugin de rapport
+             fait échouer tout le moteur au démarrage (« Cucumber needs a JSON library »). -->
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <!-- @Suite : point d'entrée Maven / IDE des scénarios Gherkin -->
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-suite</artifactId>
         </dependency>
     </dependencies>
 
@@ -128,6 +164,13 @@
                     </includes>
                     <trimStackTrace>false</trimStackTrace>
                     <!-- Les -Dcle=valeur passés à Maven sont transmis à la JVM de test -->
+                    <!--
+                        Surefire >= 3.5.4 obligatoire pour les scénarios Gherkin : la 3.5.3 ne compte pas
+                        les tests sans classe Java (Cucumber) et laisse passer un scénario en échec
+                        (BUILD SUCCESS). Effet de bord de la 3.5.4+ : dans target/surefire-reports/*.xml,
+                        l'attribut classname vaut le @DisplayName de la classe (ex. « Connexion - cas passants »)
+                        et non plus son nom qualifié ; les noms de fichiers TEST-<classe>.xml sont inchangés.
+                    -->
                 </configuration>
             </plugin>
 
