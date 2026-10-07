@@ -1,0 +1,10 @@
+id,description,utilisateur,motDePasse,messageAttendu
+# Cellule vide = champ laissé vide. Les messages sont entre guillemets (ils peuvent contenir des virgules).
+LNP-01,Utilisateur verrouillé,locked_out_user,${motdepasse.defaut},"Epic sadface: Sorry, this user has been locked out."
+LNP-02,Nom d'utilisateur et mot de passe vides,,,"Epic sadface: Username is required"
+LNP-03,Nom d'utilisateur vide,,${motdepasse.defaut},"Epic sadface: Username is required"
+LNP-04,Mot de passe vide,standard_user,,"Epic sadface: Password is required"
+LNP-05,Mot de passe erroné,standard_user,mauvais_mot_de_passe,"Epic sadface: Username and password do not match any user in this service"
+LNP-06,Utilisateur inconnu,utilisateur_inconnu,${motdepasse.defaut},"Epic sadface: Username and password do not match any user in this service"
+LNP-07,Casse du nom d'utilisateur non respectée,Standard_User,${motdepasse.defaut},"Epic sadface: Username and password do not match any user in this service"
+LNP-08,Casse du mot de passe non respectée,standard_user,SECRET_SAUCE,"Epic sadface: Username and password do not match any user in this service"

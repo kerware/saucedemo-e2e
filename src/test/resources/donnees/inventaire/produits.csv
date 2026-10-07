@@ -1,0 +1,10 @@
+# Dernière génération/modification faite par l'IA Claude le 07/10/2026 15:52:12
+id,nom,prix
+# Catalogue attendu sur la page d'inventaire (ordre du fichier : tri par défaut « Name (A to Z) »).
+# Prix en dollars, point décimal, 2 décimales, sans symbole. Le nom doit correspondre EXACTEMENT au nom affiché.
+PR-01,Sauce Labs Backpack,29.99
+PR-02,Sauce Labs Bike Light,9.99
+PR-03,Sauce Labs Bolt T-Shirt,15.99
+PR-04,Sauce Labs Fleece Jacket,49.99
+PR-05,Sauce Labs Onesie,7.99
+PR-06,Test.allTheThings() T-Shirt (Red),15.99

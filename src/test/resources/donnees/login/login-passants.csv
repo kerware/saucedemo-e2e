@@ -1,0 +1,8 @@
+id,description,utilisateur,motDePasse
+# Les lignes commençant par # sont des commentaires.
+# ${motdepasse.defaut} est résolu depuis la configuration (fichier, -D ou variable E2E_MOTDEPASSE_DEFAUT).
+LP-01,Utilisateur standard,standard_user,${motdepasse.defaut}
+LP-02,Utilisateur avec anomalies d'affichage,problem_user,${motdepasse.defaut}
+LP-03,Utilisateur avec lenteurs,performance_glitch_user,${motdepasse.defaut}
+LP-04,Utilisateur avec erreurs fonctionnelles,error_user,${motdepasse.defaut}
+LP-05,Utilisateur avec écarts visuels,visual_user,${motdepasse.defaut}

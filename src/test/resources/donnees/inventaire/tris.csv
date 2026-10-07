@@ -1,0 +1,9 @@
+# Dernière génération/modification faite par l'IA Claude le 07/10/2026 15:52:12
+id,codeOption,libelle,triPrealable
+# codeOption / triPrealable : valeurs HTML des options (az, za, lohi, hilo).
+# triPrealable est appliqué AVANT le tri testé et doit en différer : « az » est actif au chargement,
+# le sélectionner directement ne prouverait rien.
+TRI-01,az,Name (A to Z),za
+TRI-02,za,Name (Z to A),lohi
+TRI-03,lohi,Price (low to high),hilo
+TRI-04,hilo,Price (high to low),lohi

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Journalisation des tests :
+      - console : niveau INFO, préfixé par l'identifiant du test courant ;
+      - logs/execution.log : toute l'exécution, niveau DEBUG ;
+      - logs/<identifiant-du-test>.log : un fichier par test (intégré au rapport HTML).
+    Niveau du framework réglable par -Dlog.niveau=TRACE|DEBUG|INFO.
+-->
+<configuration>
+
+    <property name="RAPPORT_DIR" value="${rapport.repertoire:-target/rapport-e2e}"/>
+    <property name="MOTIF_FICHIER" value="%d{HH:mm:ss.SSS} %-5level %-28logger{28} - %msg%n"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>INFO</level>
+        </filter>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%X{testFichier:-framework}] %logger{20} - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <appender name="EXECUTION" class="ch.qos.logback.core.FileAppender">
+        <file>${RAPPORT_DIR}/logs/execution.log</file>
+        <append>false</append>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%X{testFichier:-framework}] %logger{28} - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <appender name="PAR_TEST" class="ch.qos.logback.classic.sift.SiftingAppender">
+        <discriminator>
+            <key>testFichier</key>
+            <defaultValue>hors-test</defaultValue>
+        </discriminator>
+        <sift>
+            <appender name="FICHIER-${testFichier}" class="ch.qos.logback.core.FileAppender">
+                <file>${RAPPORT_DIR}/logs/${testFichier}.log</file>
+                <append>false</append>
+                <encoder>
+                    <pattern>${MOTIF_FICHIER}</pattern>
+                    <charset>UTF-8</charset>
+                </encoder>
+            </appender>
+        </sift>
+    </appender>
+
+    <logger name="com.kerware.e2e" level="${log.niveau:-DEBUG}"/>
+    <logger name="e2e.navigateur" level="${log.niveau:-DEBUG}"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="EXECUTION"/>
+        <appender-ref ref="PAR_TEST"/>
+    </root>
+</configuration>
